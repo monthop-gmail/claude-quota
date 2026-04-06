@@ -71,6 +71,9 @@
 
                 const remaining = Math.max(0, Math.floor((state.nextReset - Date.now()) / 60000));
                 document.getElementById('inputMins').value = remaining;
+            } else {
+                const savedMins = localStorage.getItem('quota_last_mins');
+                if (savedMins) document.getElementById('inputMins').value = savedMins;
             }
             render();
         }
@@ -81,6 +84,7 @@
             state.lastSync = Date.now();
 
             localStorage.setItem('quota_v3_no_usage', JSON.stringify(state));
+            localStorage.setItem('quota_last_mins', mins);
             render();
         }
 
