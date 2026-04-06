@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Quota 5H Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Inter:wght@400;600;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f1f5f9; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .cycle-active { border-left: 4px solid #3b82f6; background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%); }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="safe-area-bottom">
+
+    <!-- Config Header -->
+    <header class="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 p-4">
+        <div class="max-w-md mx-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h1 class="text-lg font-extrabold tracking-tight">AI QUOTA <span class="text-blue-500">5H</span></h1>
+                <button id="refreshData" class="text-slate-400 hover:text-white p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                </button>
+            </div>
+
+            <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-2xl">
+                <div class="mb-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center block">Resets In (Min)</label>
+                        <input type="number" id="inputMins" value="104" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-3 text-center text-lg mono focus:border-blue-500 outline-none transition-all">
+                    </div>
+                </div>
+                <button id="syncAction" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white py-3 rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-900/20 uppercase tracking-widest">
+                    Update Sync Point
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto p-4 pt-6">
+        <div class="flex items-center gap-2 mb-6 px-1">
+            <div class="h-px flex-1 bg-slate-800"></div>
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cycle Timeline (±2 Days)</span>
+            <div class="h-px flex-1 bg-slate-800"></div>
+        </div>
+
+        <div id="cycleList" class="space-y-3 relative">
+            <div class="absolute left-[15px] top-0 bottom-0 w-[1px] bg-slate-800 z-0"></div>
+        </div>
+    </main>
+
+    <script>
+        const CYCLE_DURATION = 5 * 60 * 60 * 1000;
+        const LOOK_WINDOW = 2 * 24 * 60 * 60 * 1000;
+
+        let state = {
+            nextReset: Date.now() + (104 * 60 * 1000),
+            lastSync: Date.now()
+        };
+
+        function init() {
+            const saved = localStorage.getItem('quota_v3_no_usage');
+            if (saved) {
+                const data = JSON.parse(saved);
+                state.nextReset = data.nextReset;
+                state.lastSync = data.lastSync;
+
+                const remaining = Math.max(0, Math.floor((state.nextReset - Date.now()) / 60000));
+                document.getElementById('inputMins').value = remaining;
+            }
+            render();
+        }
+
+        function sync() {
+            const mins = parseInt(document.getElementById('inputMins').value) || 0;
+            state.nextReset = Date.now() + (mins * 60 * 1000);
+            state.lastSync = Date.now();
+
+            localStorage.setItem('quota_v3_no_usage', JSON.stringify(state));
+            render();
+        }
+
+        function render() {
+            const list = document.getElementById('cycleList');
+            list.innerHTML = '<div class="absolute left-[15px] top-0 bottom-0 w-[1px] bg-slate-800 z-0"></div>';
+
+            const now = Date.now();
+            const anchorPoint = state.nextReset - CYCLE_DURATION;
+
+            let iter = anchorPoint;
+            while (iter > now - LOOK_WINDOW) {
+                iter -= CYCLE_DURATION;
+            }
+
+            while (iter < now + LOOK_WINDOW) {
+                const sTime = iter;
+                const eTime = iter + CYCLE_DURATION;
+                const isActive = now >= sTime && now < eTime;
+                const isPast = eTime <= now;
+
+                const card = document.createElement('div');
+                card.className = `relative z-10 flex gap-4 p-4 rounded-2xl transition-all border ${isActive ? 'cycle-active border-blue-500/30 shadow-xl shadow-blue-900/10' : 'border-transparent'}`;
+
+                const d = new Date(sTime);
+                const dateStr = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+                const timeStr = `${d.getHours().toString().padStart(2,'0')}:00`;
+                const endStr = `${new Date(eTime).getHours().toString().padStart(2,'0')}:00`;
+
+                card.innerHTML = `
+                    <div class="flex flex-col items-center pt-1.5">
+                        <div class="w-2.5 h-2.5 rounded-full ring-4 ${isActive ? 'bg-blue-500 ring-blue-500/20 animate-pulse' : isPast ? 'bg-slate-700 ring-slate-900' : 'bg-slate-500 ring-slate-900'}"></div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-[10px] font-bold ${isActive ? 'text-blue-400' : 'text-slate-500'} uppercase tracking-tighter">${dateStr}</span>
+                            ${isActive ? '<span class="bg-blue-600/20 text-blue-400 text-[9px] px-2 py-0.5 rounded-full font-black tracking-widest uppercase">Active Now</span>' : ''}
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-lg font-bold ${isActive ? 'text-white' : 'text-slate-400'} mono">${timeStr}</span>
+                            <span class="text-xs text-slate-600 font-medium">to ${endStr}</span>
+                        </div>
+                        ${isActive ? `
+                            <div class="mt-2 text-[10px] font-bold text-slate-500 mono uppercase tracking-tight">
+                                Ends in ${Math.floor((eTime - now)/60000)}m
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                list.appendChild(card);
+                iter += CYCLE_DURATION;
+            }
+
+            if (document.querySelector('.cycle-active')) {
+                setTimeout(() => {
+                    document.querySelector('.cycle-active').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            }
+        }
+
+        document.getElementById('syncAction').addEventListener('click', sync);
+        document.getElementById('refreshData').addEventListener('click', render);
+        window.onload = init;
+    </script>
+</body>
+</html>
