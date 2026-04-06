@@ -29,9 +29,17 @@
 
             <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-2xl">
                 <div class="mb-4">
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center block">Resets In (Min)</label>
-                        <input type="number" id="inputMins" value="104" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-3 text-center text-lg mono focus:border-blue-500 outline-none transition-all">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center block mb-2">Resets In</label>
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1 flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-xl px-3 py-3 focus-within:border-blue-500 transition-all">
+                            <input type="number" id="inputHrs" min="0" max="23" value="1" class="w-full bg-transparent text-center text-lg mono outline-none">
+                            <span class="text-xs font-bold text-slate-500 shrink-0">hr</span>
+                        </div>
+                        <span class="text-slate-600 font-bold">:</span>
+                        <div class="flex-1 flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-xl px-3 py-3 focus-within:border-blue-500 transition-all">
+                            <input type="number" id="inputMins" min="0" max="59" value="44" class="w-full bg-transparent text-center text-lg mono outline-none">
+                            <span class="text-xs font-bold text-slate-500 shrink-0">min</span>
+                        </div>
                     </div>
                 </div>
                 <button id="syncAction" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white py-3 rounded-xl text-xs font-black transition-all shadow-lg shadow-blue-900/20 uppercase tracking-widest">
@@ -62,6 +70,17 @@
             lastSync: Date.now()
         };
 
+        function setInputFromMins(totalMins) {
+            document.getElementById('inputHrs').value = Math.floor(totalMins / 60);
+            document.getElementById('inputMins').value = totalMins % 60;
+        }
+
+        function getTotalMins() {
+            const hrs = parseInt(document.getElementById('inputHrs').value) || 0;
+            const mins = parseInt(document.getElementById('inputMins').value) || 0;
+            return hrs * 60 + mins;
+        }
+
         function init() {
             const saved = localStorage.getItem('quota_v3_no_usage');
             if (saved) {
@@ -70,21 +89,21 @@
                 state.lastSync = data.lastSync;
 
                 const remaining = Math.max(0, Math.floor((state.nextReset - Date.now()) / 60000));
-                document.getElementById('inputMins').value = remaining;
+                setInputFromMins(remaining);
             } else {
                 const savedMins = localStorage.getItem('quota_last_mins');
-                if (savedMins) document.getElementById('inputMins').value = savedMins;
+                if (savedMins) setInputFromMins(parseInt(savedMins));
             }
             render();
         }
 
         function sync() {
-            const mins = parseInt(document.getElementById('inputMins').value) || 0;
-            state.nextReset = Date.now() + (mins * 60 * 1000);
+            const totalMins = getTotalMins();
+            state.nextReset = Date.now() + (totalMins * 60 * 1000);
             state.lastSync = Date.now();
 
             localStorage.setItem('quota_v3_no_usage', JSON.stringify(state));
-            localStorage.setItem('quota_last_mins', mins);
+            localStorage.setItem('quota_last_mins', totalMins);
             render();
         }
 
